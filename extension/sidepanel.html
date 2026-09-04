@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ezy-Meta Bridge</title>
+  <link rel="stylesheet" href="popup.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="header">
+      <div class="brand">
+        <div class="logo-icon">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-title">EZY-META</span>
+          <span class="brand-sub">BRIDGE V1.0</span>
+        </div>
+      </div>
+      <div id="overallStatusBadge" class="status-badge status-offline">
+        <span class="pulse-dot"></span>
+        <span id="overallStatusText">OFFLINE</span>
+      </div>
+    </header>
+
+    <!-- Metrics Bar -->
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="metric-value" id="statGenerated">0</div>
+        <div class="metric-label">VIDEOS GEN</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="statQueue">0</div>
+        <div class="metric-label">QUEUED</div>
+      </div>
+      <div class="metric-card">
+        <div class="metric-value" id="statRate">100%</div>
+        <div class="metric-label">SUCCESS</div>
+      </div>
+    </div>
+
+    <!-- Node Status Grid -->
+    <div class="status-panel">
+      <div class="status-row">
+        <div class="status-col">
+          <span class="label">CLI DAEMON</span>
+          <div class="indicator">
+            <span id="cliDot" class="dot dot-off"></span>
+            <span id="cliStatusText" class="val">Disconnected</span>
+          </div>
+        </div>
+        <div class="status-col">
+          <span class="label">META.AI TAB</span>
+          <div class="indicator">
+            <span id="metaDot" class="dot dot-off"></span>
+            <span id="metaStatusText" class="val">Tab Not Found</span>
+          </div>
+        </div>
+      </div>
+      <div class="user-row" id="userRow" style="display: none;">
+        <span class="user-label">USER:</span>
+        <span class="user-name" id="userName">rovoary07</span>
+      </div>
+    </div>
+
+    <!-- Active Task Monitor -->
+    <div class="section-container">
+      <div class="section-title">
+        <span>ACTIVE WORKFLOW</span>
+        <span id="activeBadge" class="mini-tag idle">IDLE</span>
+      </div>
+      <div id="activeTaskCard" class="active-card idle">
+        <div id="idleStateText" class="idle-text">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          <span>Waiting for CLI commands</span>
+        </div>
+        <div id="activeRunningState" style="display: none;">
+          <div class="active-header">
+            <span class="active-id" id="activeTaskId">TASK_123</span>
+            <span class="active-time" id="activeTaskElapsed">0s</span>
+          </div>
+          <div class="active-prompt" id="activeTaskPrompt">Turn this photo into a video</div>
+          <div class="progress-bar-wrap">
+            <div class="progress-bar-fill" id="activeProgressBar"></div>
+          </div>
+          <div class="active-step-text" id="activeTaskStep">Uploading image...</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="tab-header">
+      <button id="btnTabQueue" class="tab-btn active">TASK QUEUE (<span id="tabQueueCount">0</span>)</button>
+      <button id="btnTabHistory" class="tab-btn">HISTORY (<span id="tabHistoryCount">0</span>)</button>
+    </div>
+
+    <!-- Tab Contents -->
+    <div class="tab-body">
+      <!-- Queue View -->
+      <div id="tabContentQueue" class="tab-pane active">
+        <div id="queueList" class="item-list">
+          <div class="empty-list">No tasks currently queued.</div>
+        </div>
+      </div>
+
+      <!-- History View -->
+      <div id="tabContentHistory" class="tab-pane">
+        <div id="historyList" class="item-list">
+          <div class="empty-list">No generation history yet.</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Controls -->
+    <footer class="footer">
+      <button id="btnOpenMeta" class="btn btn-primary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path>
+          <polyline points="15 3 21 3 21 9"></polyline>
+          <line x1="10" y1="14" x2="21" y2="3"></line>
+        </svg>
+        OPEN META AI
+      </button>
+      <button id="btnReconnect" class="btn btn-secondary">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M23 4v6h-6"></path>
+          <path d="M1 20v-6h6"></path>
+          <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+        </svg>
+        SYNC CLI
+      </button>
+    </footer>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>

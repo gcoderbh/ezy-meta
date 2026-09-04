@@ -1,0 +1,224 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 680" width="100%" height="100%">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&amp;family=Geist+Mono:wght@400;500;600&amp;family=Instrument+Serif:ital@0;1&amp;display=swap');
+
+      .bg { fill: #0b0f14; }
+      .zone-bg { fill: rgba(22, 27, 34, 0.45); stroke: #21262d; stroke-width: 1; stroke-dasharray: 4,4; rx: 8px; }
+      .zone-tag { font-family: 'Geist Mono', monospace; font-size: 8px; font-weight: 600; fill: #8b949e; letter-spacing: 0.16em; }
+      .zone-mask { fill: #0b0f14; }
+      
+      .node-bg { fill: #161b22; stroke: #30363d; stroke-width: 1; rx: 6px; }
+      .node-focal { fill: #132219; stroke: #00ff66; stroke-width: 1.5; rx: 6px; }
+      .node-focal-alt { fill: #1c1d28; stroke: #79c0ff; stroke-width: 1.5; rx: 6px; }
+      
+      .title-main { font-family: 'Instrument Serif', Georgia, serif; font-size: 26px; fill: #f0f6fc; font-weight: 400; }
+      .title-sub { font-family: 'Geist Mono', monospace; font-size: 10px; fill: #8b949e; letter-spacing: 0.08em; }
+      
+      .node-title { font-family: 'Geist', sans-serif; font-size: 12px; font-weight: 600; fill: #f0f6fc; }
+      .node-title-focal { font-family: 'Geist', sans-serif; font-size: 12px; font-weight: 600; fill: #00ff66; }
+      .node-title-focal-alt { font-family: 'Geist', sans-serif; font-size: 12px; font-weight: 600; fill: #79c0ff; }
+      .node-desc { font-family: 'Geist Mono', monospace; font-size: 9px; fill: #8b949e; }
+      .node-badge { font-family: 'Geist Mono', monospace; font-size: 8px; font-weight: 600; fill: #3fb950; }
+      
+      .wire { fill: none; stroke: #484f58; stroke-width: 1.2; }
+      .wire-focal { fill: none; stroke: #00ff66; stroke-width: 1.4; }
+      .wire-data { fill: none; stroke: #58a6ff; stroke-width: 1.2; stroke-dasharray: 4,3; }
+      
+      .wire-label { font-family: 'Geist Mono', monospace; font-size: 8px; fill: #8b949e; }
+      .label-bg { fill: #0b0f14; }
+    </style>
+
+    <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#484f58" />
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#00ff66" />
+    </marker>
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1 L 10 5 L 0 9 z" fill="#58a6ff" />
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1100" height="680" class="bg" />
+
+  <!-- Header -->
+  <text x="40" y="44" class="title-main">Ezy-Meta Architecture</text>
+  <text x="310" y="42" class="title-sub">SYSTEM TOPOLOGY • PROTOCOL FLOW • PURE JS EVALUATOR</text>
+  <line x1="40" y1="56" x2="1060" y2="56" stroke="#21262d" stroke-width="1" />
+
+  <!-- ==================== ZONE 1: WORKSPACE & CLIENT ==================== -->
+  <rect x="40" y="75" width="220" height="570" class="zone-bg" />
+  <rect x="52" y="68" width="136" height="14" class="zone-mask" />
+  <text x="56" y="79" class="zone-tag">LOCAL WORKSPACE / CLI</text>
+
+  <!-- Node 1: CLI Client -->
+  <g id="node-cli">
+    <rect x="55" y="105" width="190" height="76" class="node-bg" />
+    <text x="70" y="128" class="node-title">CLI Client</text>
+    <text x="70" y="145" class="node-desc">bin/ezy-meta.js</text>
+    <text x="70" y="162" class="node-desc">animate | status | history</text>
+  </g>
+
+  <!-- Node 2: Agent Skill -->
+  <g id="node-skill">
+    <rect x="55" y="240" width="190" height="76" class="node-bg" />
+    <text x="70" y="263" class="node-title">Agent Skill</text>
+    <text x="70" y="280" class="node-desc">.agents/skills/ezy-meta</text>
+    <text x="70" y="297" class="node-desc">Autonomous AI Dispatch</text>
+  </g>
+
+  <!-- Node 3: Local Storage / Output -->
+  <g id="node-storage">
+    <rect x="55" y="460" width="190" height="86" class="node-bg" />
+    <text x="70" y="483" class="node-title">Output Store</text>
+    <text x="70" y="500" class="node-desc">./output/*.mp4</text>
+    <text x="70" y="517" class="node-desc">.ezy-meta-history.json</text>
+    <text x="70" y="534" class="node-badge">● DEDUPLICATED BEST VIDEO</text>
+  </g>
+
+
+  <!-- ==================== ZONE 2: BRIDGE DAEMON ==================== -->
+  <rect x="285" y="75" width="255" height="570" class="zone-bg" />
+  <rect x="297" y="68" width="165" height="14" class="zone-mask" />
+  <text x="301" y="79" class="zone-tag">BRIDGE DAEMON &amp; ENGINE</text>
+
+  <!-- Node 4: HTTP & WS Server -->
+  <g id="node-daemon">
+    <rect x="300" y="105" width="225" height="76" class="node-bg" />
+    <text x="315" y="128" class="node-title">Daemon Server</text>
+    <text x="315" y="145" class="node-desc">127.0.0.1:4242 (HTTP / WS)</text>
+    <text x="315" y="162" class="node-desc">src/server/daemon.js</text>
+  </g>
+
+  <!-- Node 5: Task Queue & Debounce -->
+  <g id="node-queue">
+    <rect x="300" y="240" width="225" height="76" class="node-bg" />
+    <text x="315" y="263" class="node-title">Queue &amp; Debounce</text>
+    <text x="315" y="280" class="node-desc">src/server/queue.js</text>
+    <text x="315" y="297" class="node-desc">2.5s Candidate Window</text>
+  </g>
+
+  <!-- Node 6: Pure JS MP4 Evaluator (FOCAL ACCENT) -->
+  <g id="node-evaluator">
+    <rect x="300" y="445" width="225" height="105" class="node-focal" />
+    <text x="315" y="468" class="node-title-focal">Quality Evaluator</text>
+    <text x="315" y="485" class="node-desc">src/server/evaluator.js</text>
+    <text x="315" y="502" class="node-desc">ISO Box Parser (moov/tkhd)</text>
+    <text x="315" y="519" class="node-desc">Score = Pixels + Bitrate*100</text>
+    <text x="315" y="536" class="node-badge">● ZERO-DEPENDENCY PARSER</text>
+  </g>
+
+
+  <!-- ==================== ZONE 3: CHROME EXTENSION ==================== -->
+  <rect x="565" y="75" width="255" height="570" class="zone-bg" />
+  <rect x="577" y="68" width="168" height="14" class="zone-mask" />
+  <text x="581" y="79" class="zone-tag">CHROME EXTENSION (MV3)</text>
+
+  <!-- Node 7: Background Worker -->
+  <g id="node-bg-worker">
+    <rect x="580" y="105" width="225" height="76" class="node-bg" />
+    <text x="595" y="128" class="node-title">Background Worker</text>
+    <text x="595" y="145" class="node-desc">extension/background.js</text>
+    <text x="595" y="162" class="node-desc">WebSocket Bridge Client</text>
+  </g>
+
+  <!-- Node 8: Side Panel UI -->
+  <g id="node-sidepanel">
+    <rect x="580" y="240" width="225" height="76" class="node-bg" />
+    <text x="595" y="263" class="node-title">Cyberpunk Side Panel</text>
+    <text x="595" y="280" class="node-desc">extension/popup.html</text>
+    <text x="595" y="297" class="node-desc">Status, Queue &amp; Quality Badges</text>
+  </g>
+
+  <!-- Node 9: Content Script Bridge -->
+  <g id="node-contentscript">
+    <rect x="580" y="460" width="225" height="86" class="node-bg" />
+    <text x="595" y="483" class="node-title">Content Script</text>
+    <text x="595" y="500" class="node-desc">extension/content.js</text>
+    <text x="595" y="517" class="node-desc">DOM &amp; Textarea Prototype Setter</text>
+    <text x="595" y="534" class="node-desc">Action Rail 'Animate' Clicker</text>
+  </g>
+
+
+  <!-- ==================== ZONE 4: META AI CLOUD ==================== -->
+  <rect x="845" y="75" width="215" height="570" class="zone-bg" />
+  <rect x="857" y="68" width="135" height="14" class="zone-mask" />
+  <text x="861" y="79" class="zone-tag">META AI CLOUD</text>
+
+  <!-- Node 10: Meta AI Web Client -->
+  <g id="node-meta-web">
+    <rect x="860" y="240" width="185" height="80" class="node-bg" />
+    <text x="875" y="263" class="node-title">Meta AI Web UI</text>
+    <text x="875" y="280" class="node-desc">https://www.meta.ai/</text>
+    <text x="875" y="297" class="node-desc">Active Tab #550725555</text>
+  </g>
+
+  <!-- Node 11: Meta Media CDN (FOCAL BLUE) -->
+  <g id="node-meta-cdn">
+    <rect x="860" y="460" width="185" height="86" class="node-focal-alt" />
+    <text x="875" y="483" class="node-title-focal-alt">Meta Media CDN</text>
+    <text x="875" y="500" class="node-desc">*.fbcdn.net/*.mp4</text>
+    <text x="875" y="517" class="node-desc">Progressive Stream Chunks</text>
+    <text x="875" y="534" class="node-badge" style="fill: #79c0ff;">● H.264 MP4 STREAMS</text>
+  </g>
+
+
+  <!-- ==================== ORTHOGONAL CONNECTORS ==================== -->
+
+  <!-- CLI -> Daemon (HTTP /api/animate) -->
+  <path d="M 245 143 H 300" class="wire" marker-end="url(#arrow)" />
+  <rect x="254" y="136" width="36" height="12" class="label-bg" />
+  <text x="256" y="145" class="wire-label">POST</text>
+
+  <!-- Skill -> Daemon (Auto Dispatch) -->
+  <path d="M 245 278 H 272 Q 280 278 280 270 V 170 Q 280 162 288 162 H 300" class="wire" marker-end="url(#arrow)" />
+
+  <!-- Daemon -> Queue (Enqueue) -->
+  <path d="M 412 181 V 240" class="wire" marker-end="url(#arrow)" />
+  <rect x="394" y="204" width="36" height="12" class="label-bg" />
+  <text x="396" y="213" class="wire-label">Enqueue</text>
+
+  <!-- Daemon <-> Background Worker (WebSocket ws://127.0.0.1:4242) -->
+  <path d="M 525 143 H 580" class="wire" marker-end="url(#arrow)" />
+  <rect x="535" y="136" width="36" height="12" class="label-bg" />
+  <text x="538" y="145" class="wire-label">WS RPC</text>
+
+  <!-- Background Worker -> Side Panel (State broadcast) -->
+  <path d="M 692 181 V 240" class="wire" marker-end="url(#arrow)" />
+
+  <!-- Background Worker -> Content Script (Execute Animate Task) -->
+  <path d="M 750 181 V 440 Q 750 448 742 448 H 700 Q 692 448 692 460" class="wire" marker-end="url(#arrow)" />
+  <rect x="728" y="280" width="46" height="12" class="label-bg" />
+  <text x="730" y="289" class="wire-label">Inject &amp; Run</text>
+
+  <!-- Content Script -> Meta AI UI (DOM Manipulation & Textarea Dispatch) -->
+  <path d="M 770 460 V 340 Q 770 330 780 330 H 840 Q 850 330 850 310 V 300 H 860" class="wire" marker-end="url(#arrow)" />
+  <rect x="785" y="324" width="56" height="12" class="label-bg" />
+  <text x="787" y="333" class="wire-label">Trigger Animate</text>
+
+  <!-- Meta AI UI -> Meta CDN (Generate Video) -->
+  <path d="M 952 320 V 460" class="wire" marker-end="url(#arrow)" />
+  <rect x="926" y="380" width="52" height="12" class="label-bg" />
+  <text x="928" y="389" class="wire-label">Render H.264</text>
+
+  <!-- Meta CDN -> Chrome webRequest Sniffer in Background.js -->
+  <path d="M 860 495 H 828 Q 820 495 820 487 V 162 Q 820 154 812 154 H 805" class="wire-data" marker-end="url(#arrow-blue)" />
+  <rect x="802" y="220" width="36" height="12" class="label-bg" />
+  <text x="804" y="229" class="wire-label" style="fill: #58a6ff;">Sniff CDN</text>
+
+  <!-- Background Worker -> Queue (VIDEO_CANDIDATE stream) -->
+  <path d="M 640 181 V 220 Q 640 228 632 228 H 538 Q 530 228 530 236 V 260 H 525" class="wire-data" marker-end="url(#arrow-blue)" />
+
+  <!-- Queue -> Evaluator (Multi-candidate Window Batch) -->
+  <path d="M 412 316 V 445" class="wire-focal" marker-end="url(#arrow-green)" />
+  <rect x="368" y="375" width="88" height="12" class="label-bg" />
+  <text x="370" y="384" class="wire-label" style="fill: #00ff66;">Batch Quality Eval</text>
+
+  <!-- Evaluator -> Output Store (Save Best Video & Purge Duplicates) -->
+  <path d="M 300 497 H 245" class="wire-focal" marker-end="url(#arrow-green)" />
+  <rect x="250" y="490" width="46" height="12" class="label-bg" />
+  <text x="252" y="499" class="wire-label" style="fill: #00ff66;">Save Best</text>
+
+</svg>

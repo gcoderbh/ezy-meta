@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "name": "Ezy-Meta Bridge",
+  "version": "1.0.0",
+  "description": "Bridge between CLI and Meta AI for automated Image-to-Video generation",
+  "permissions": [
+    "sidePanel",
+    "tabs",
+    "activeTab",
+    "storage",
+    "scripting",
+    "webRequest"
+  ],
+  "host_permissions": [
+    "*://*.meta.ai/*",
+    "*://*.fbcdn.net/*",
+    "http://127.0.0.1:4242/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.meta.ai/*"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ],
+  "action": {
+    "default_title": "Open Ezy-Meta Sidebar",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

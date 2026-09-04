@@ -1,0 +1,34 @@
+{
+  "name": "ezy-meta",
+  "version": "1.0.0",
+  "description": "CLI and Chrome Extension bridge for Meta AI Image-to-Video generation",
+  "main": "src/index.js",
+  "bin": {
+    "ezy-meta": "./bin/ezy-meta.js"
+  },
+  "type": "module",
+  "scripts": {
+    "start": "node bin/ezy-meta.js serve",
+    "status": "node bin/ezy-meta.js status"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "keywords": [
+    "meta-ai",
+    "image-to-video",
+    "chrome-extension",
+    "bridge",
+    "cli"
+  ],
+  "author": "Prajuk Kongrugpawndamrong <gcoderbh@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/gcoderbh/ezy-meta.git"
+  },
+  "bugs": {
+    "url": "https://github.com/gcoderbh/ezy-meta/issues"
+  },
+  "homepage": "https://github.com/gcoderbh/ezy-meta#readme",
+  "license": "MIT"
+}
