@@ -35,7 +35,7 @@ export class TaskQueue extends EventEmitter {
     }
   }
 
-  enqueue({ id, imagePath, imageBase64, mimeType, prompt, outputPath }) {
+  enqueue({ id, imagePath, imageBase64, mimeType, prompt, outputPath, freshSession = false }) {
     const task = {
       id: id || "task_" + Date.now() + "_" + Math.random().toString(36).substring(2, 7),
       imagePath,
@@ -43,6 +43,7 @@ export class TaskQueue extends EventEmitter {
       mimeType: mimeType || "image/jpeg",
       prompt: prompt || "Turn this photo into a video",
       outputPath,
+      freshSession: !!freshSession,
       status: "PENDING", // PENDING, PROCESSING, COMPLETED, FAILED
       progress: "Queued",
       createdAt: new Date().toISOString(),

@@ -49,11 +49,37 @@ function setupActions() {
     btn.innerText = "SYNCING...";
     chrome.runtime.sendMessage({ type: "FORCE_RECONNECT" }, () => {
       setTimeout(() => {
-        btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> SYNC CLI`;
+        btn.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 4v6h-6"></path><path d="M1 20v-6h6"></path><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg> SYNC CLI`;
         fetchState();
       }, 600);
     });
   });
+
+  const btnReload = document.getElementById("btnReloadTab");
+  if (btnReload) {
+    btnReload.addEventListener("click", () => {
+      btnReload.innerText = "RELOADING...";
+      chrome.runtime.sendMessage({ type: "RELOAD_SESSION", newChat: false }, () => {
+        setTimeout(() => {
+          btnReload.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 4 23 10 17 10"></polyline><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg> RELOAD TAB`;
+          fetchState();
+        }, 1200);
+      });
+    });
+  }
+
+  const btnNewChat = document.getElementById("btnNewChat");
+  if (btnNewChat) {
+    btnNewChat.addEventListener("click", () => {
+      btnNewChat.innerText = "STARTING...";
+      chrome.runtime.sendMessage({ type: "RELOAD_SESSION", newChat: true }, () => {
+        setTimeout(() => {
+          btnNewChat.innerHTML = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg> NEW CHAT`;
+          fetchState();
+        }, 1200);
+      });
+    });
+  }
 }
 
 function fetchState() {

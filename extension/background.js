@@ -16,8 +16,69 @@ const state = {
   },
   activeTask: null,
   queue: [],
-  history: []
+  history: [],
+  session: {
+    consecutiveGenerations: 0,
+    maxConsecutiveBeforeRefresh: 5,
+    lastRefresh: new Date().toISOString()
+  }
 };
+
+let consecutiveGenerations = 0;
+const MAX_CONSECUTIVE_BEFORE_REFRESH = 5;
+
+// Helper: Reload or reset Meta AI tab with completion promise
+async function reloadMetaAiTab({ newChat = false } = {}) {
+  if (!metaAiTabId) {
+    await checkMetaAiTab();
+  }
+  if (!metaAiTabId) {
+    throw new Error("No active Meta AI tab found to reload");
+  }
+
+  const tabId = metaAiTabId;
+  const targetUrl = newChat ? "https://www.meta.ai/" : null;
+
+  state.metaAiReady = false;
+  state.session.lastRefresh = new Date().toISOString();
+  broadcastState();
+
+  return new Promise((resolve) => {
+    let resolved = false;
+
+    const onComplete = async () => {
+      if (resolved) return;
+      resolved = true;
+      consecutiveGenerations = 0;
+      state.session.consecutiveGenerations = 0;
+      setTimeout(async () => {
+        await checkMetaAiTab();
+        resolve({ ok: true, tabId, newChat });
+      }, 1200);
+    };
+
+    const onUpdatedListener = (updatedTabId, changeInfo) => {
+      if (updatedTabId === tabId && changeInfo.status === "complete") {
+        chrome.tabs.onUpdated.removeListener(onUpdatedListener);
+        onComplete();
+      }
+    };
+
+    chrome.tabs.onUpdated.addListener(onUpdatedListener);
+
+    // Timeout safety fallback (12s)
+    setTimeout(() => {
+      chrome.tabs.onUpdated.removeListener(onUpdatedListener);
+      onComplete();
+    }, 12000);
+
+    if (targetUrl) {
+      chrome.tabs.update(tabId, { url: targetUrl });
+    } else {
+      chrome.tabs.reload(tabId);
+    }
+  });
+}
 
 // Enable Side Panel to open on icon click
 if (chrome.sidePanel && chrome.sidePanel.setPanelBehavior) {
@@ -228,7 +289,19 @@ function handleServerMessage(msg) {
       chrome.storage.local.set({ stats: state.stats, history: state.history.slice(0, 50) });
       state.activeTask = null;
       capturedTaskUrls.delete(taskId);
+      consecutiveGenerations++;
+      state.session.consecutiveGenerations = consecutiveGenerations;
       broadcastState();
+      break;
+    }
+
+    case "RELOAD_SESSION": {
+      const { reqId, newChat } = msg.payload || {};
+      reloadMetaAiTab({ newChat: !!newChat }).then(res => {
+        sendToServer("RELOAD_RESULT", { reqId, ...res });
+      }).catch(err => {
+        sendToServer("RELOAD_RESULT", { reqId, ok: false, error: err.message });
+      });
       break;
     }
 
@@ -358,6 +431,22 @@ async function executeTaskOnMetaAi(task) {
     return;
   }
 
+  // Session check: clean chat requested or memory threshold reached
+  if (task.freshSession || task.newChat || consecutiveGenerations >= MAX_CONSECUTIVE_BEFORE_REFRESH) {
+    state.activeTask = {
+      id: task.taskId,
+      prompt: task.prompt,
+      progress: "Resetting to clean Meta AI chat session..."
+    };
+    broadcastState();
+    try {
+      console.log("[EzyMeta] Refreshing Meta AI session before task execution...");
+      await reloadMetaAiTab({ newChat: true });
+    } catch (sessionErr) {
+      console.warn("[EzyMeta] Session reset warning:", sessionErr.message);
+    }
+  }
+
   state.activeTask = {
     id: task.taskId,
     prompt: task.prompt,
@@ -450,6 +539,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     checkMetaAiTab();
     sendResponse({ ok: true });
     return;
+  }
+
+  if (request.type === "RELOAD_SESSION") {
+    reloadMetaAiTab({ newChat: !!request.newChat })
+      .then(res => sendResponse(res))
+      .catch(err => sendResponse({ ok: false, error: err.message }));
+    return true;
   }
 });
 

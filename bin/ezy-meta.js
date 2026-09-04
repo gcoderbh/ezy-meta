@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { commandServe, commandStatus, commandAnimate, commandQueue, commandHistory } from "../src/cli/commands.js";
+import { commandServe, commandStatus, commandAnimate, commandQueue, commandHistory, commandSession } from "../src/cli/commands.js";
 
 const args = process.argv.slice(2);
 const command = args[0] || "status";
@@ -36,13 +36,20 @@ switch (command) {
     commandStatus(port);
     break;
 
+  case "session":
+  case "tab":
+    const subAction = args[1] || "reload";
+    commandSession(subAction, { port });
+    break;
+
   case "animate":
   case "video":
     const imagePath = args[1] && !args[1].startsWith("--") ? args[1] : null;
     commandAnimate(imagePath, {
       port,
       prompt: flags.prompt,
-      output: flags.output || flags.out
+      output: flags.output || flags.out,
+      freshSession: !!flags.fresh || !!flags["new-session"] || !!flags["new-chat"]
     });
     break;
 
@@ -67,6 +74,7 @@ Usage:
 Commands:
   status                   Check health of Daemon, Extension & Meta AI tab
   animate <image-path>     Submit an image to generate video via Meta AI
+  session [reload|new]     Manage Meta AI browser session (reload tab or new chat)
   queue                    List pending and active generation tasks
   history                  List finished tasks and generated videos
   serve                    Run the WebSocket daemon bridge in the foreground
@@ -74,12 +82,15 @@ Commands:
 Options:
   --prompt "<text>"        Custom prompt (default: "Turn this photo into a video")
   --output "<path>"        Custom output file path for the generated MP4
+  --fresh, --new-session   Start a brand new chat session before generating
   --port <number>          Port for WebSocket & HTTP bridge (default: 4242)
   --help, -h               Show this help message
 
 Examples:
   ezy-meta status
-  ezy-meta animate ./photo.jpg
+  ezy-meta session reload
+  ezy-meta session new
+  ezy-meta animate ./photo.jpg --fresh
   ezy-meta animate ./cat.png --prompt "Make the cat run fast" --output ./cat_running.mp4
   ezy-meta queue
 `);

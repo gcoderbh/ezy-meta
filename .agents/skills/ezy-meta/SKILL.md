@@ -62,6 +62,15 @@ node bin/ezy-meta.js queue
 
 # Inspect generation history
 node bin/ezy-meta.js history
+
+# Reload Meta AI tab if session is stuck or sluggish
+node bin/ezy-meta.js session reload
+
+# Start a completely new chat session on Meta AI
+node bin/ezy-meta.js session new
+
+# Animate with a fresh conversation session
+node bin/ezy-meta.js animate ./character.png --fresh
 ```
 
 ---

@@ -154,6 +154,26 @@ node bin/ezy-meta.js animate ./dog.jpg \
   --output ./output/dog_flying.mp4
 ```
 
+To start a fresh conversation context before generating (clearing previous chat DOM state):
+```bash
+node bin/ezy-meta.js animate ./dog.jpg --prompt "..." --fresh
+```
+
+### Session Management & Auto-Recovery
+Meta AI's single-page application accumulates heavy DOM elements and video players over time. Ezy-Meta includes built-in session resilience:
+
+- **Auto-Refresh**: Automatically reloads the Meta AI tab after every 5 consecutive generations to prevent memory leakage and playback stalls.
+- **Error Sniffing**: Automatically detects Meta AI error banners (rate-limits, temporary generation failures) and flags the session.
+- **Reload Tab**: Force a clean reload of the active Meta AI browser window:
+  ```bash
+  node bin/ezy-meta.js session reload
+  ```
+- **New Conversation**: Navigate to a brand-new clean chat session (`https://www.meta.ai/`):
+  ```bash
+  node bin/ezy-meta.js session new
+  ```
+- **Side Panel Controls**: Quick-action buttons (`🔄 RELOAD TAB` and `➕ NEW CHAT`) are also accessible directly inside Chrome's Side Panel.
+
 ### View Generation History
 Displays all previous generations, file locations, and quality metrics:
 ```bash

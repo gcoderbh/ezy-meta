@@ -183,6 +183,17 @@ async function runAnimateWorkflow(task) {
         return;
       }
 
+      // Check for Meta AI session errors or rate limits
+      const errorEl = document.querySelector('[role="alert"], [data-testid*="error"]');
+      if (errorEl && errorEl.innerText) {
+        const errText = errorEl.innerText.trim();
+        if (errText.toLowerCase().includes("wrong") || errText.toLowerCase().includes("try again") || errText.toLowerCase().includes("limit")) {
+          clearInterval(checkForVideoOrAnimate);
+          fail(new Error(`Meta AI Session Error: ${errText}`));
+          return;
+        }
+      }
+
       // 1. Check if "Animate" button appears (on hover or in media action rail)
       if (!animationTriggered) {
         // Trigger hover on image cards

@@ -23,6 +23,7 @@ export class EzyMetaServer {
       lastHeartbeat: null
     };
     this.pendingInspects = {};
+    this.pendingReloads = {};
 
     this.queue.on("task_enqueued", () => this.dispatchNextTask());
   }
@@ -168,6 +169,19 @@ export class EzyMetaServer {
         break;
       }
 
+      case "RELOAD_RESULT": {
+        const { reqId, ok, tabId, newChat, error } = msg.payload || {};
+        if (reqId && this.pendingReloads[reqId]) {
+          if (error) {
+            this.pendingReloads[reqId]({ ok: false, error });
+          } else {
+            this.pendingReloads[reqId]({ ok: true, tabId, newChat });
+          }
+          delete this.pendingReloads[reqId];
+        }
+        break;
+      }
+
       default:
         break;
     }
@@ -227,6 +241,29 @@ export class EzyMetaServer {
     });
   }
 
+  reloadSession(newChat = false) {
+    return new Promise((resolve, reject) => {
+      if (!this.extensionSocket || this.extensionSocket.readyState !== 1) {
+        return reject(new Error("Chrome Extension not connected via WebSocket"));
+      }
+      const reqId = "rel_" + Date.now();
+      const timer = setTimeout(() => {
+        delete this.pendingReloads[reqId];
+        reject(new Error("Timeout waiting for Meta AI tab session reload (15s)"));
+      }, 15000);
+
+      this.pendingReloads[reqId] = (result) => {
+        clearTimeout(timer);
+        resolve(result);
+      };
+
+      this.sendToExtension({
+        type: "RELOAD_SESSION",
+        payload: { reqId, newChat }
+      });
+    });
+  }
+
   async dispatchNextTask() {
     if (!this.metaAiState.connected || !this.metaAiState.metaAiReady) {
       return false;
@@ -242,7 +279,8 @@ export class EzyMetaServer {
         taskId: task.id,
         imageBase64: task.imageBase64,
         mimeType: task.mimeType,
-        prompt: task.prompt
+        prompt: task.prompt,
+        freshSession: !!task.freshSession
       }
     });
 
@@ -444,6 +482,24 @@ export class EzyMetaServer {
       }
     }
 
+    if (url.pathname === "/api/session/reload" && req.method === "POST") {
+      try {
+        const result = await this.reloadSession(false);
+        return json({ ok: true, message: "Meta AI tab reloaded successfully", ...result });
+      } catch (err) {
+        return json({ ok: false, error: err.message }, 500);
+      }
+    }
+
+    if (url.pathname === "/api/session/new" && req.method === "POST") {
+      try {
+        const result = await this.reloadSession(true);
+        return json({ ok: true, message: "Fresh Meta AI chat session started", ...result });
+      } catch (err) {
+        return json({ ok: false, error: err.message }, 500);
+      }
+    }
+
     if (url.pathname === "/api/reload" && req.method === "POST") {
       this.sendToExtension({ type: "RELOAD_EXTENSION" });
       return json({ ok: true, message: "Reload signal sent to extension" });
@@ -464,7 +520,7 @@ export class EzyMetaServer {
       req.on("end", async () => {
         try {
           const body = JSON.parse(bodyStr || "{}");
-          let { imagePath, imageBase64, mimeType, prompt, outputPath } = body;
+          let { imagePath, imageBase64, mimeType, prompt, outputPath, freshSession } = body;
 
           if (!imageBase64 && imagePath) {
             const resolvedPath = path.resolve(imagePath);
@@ -486,7 +542,8 @@ export class EzyMetaServer {
             imageBase64,
             mimeType,
             prompt,
-            outputPath
+            outputPath,
+            freshSession: !!freshSession
           });
 
           // Broadcast to extension if active

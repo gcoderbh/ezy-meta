@@ -18,7 +18,7 @@ function fetchApi(endpoint, options = {}) {
         "Content-Type": "application/json",
         ...(options.headers || {})
       },
-      timeout: 3000
+      timeout: options.timeout || 15000
     }, (res) => {
       let data = "";
       res.on("data", chunk => { data += chunk; });
@@ -172,7 +172,8 @@ export async function commandAnimate(imagePath, options = {}) {
       body: {
         imagePath: resolvedImagePath,
         prompt,
-        outputPath
+        outputPath,
+        freshSession: !!options.freshSession
       }
     });
 
@@ -287,6 +288,30 @@ export async function commandHistory(port = DEFAULT_PORT) {
       }
       console.log("");
     });
+  } catch (err) {
+    logger.error(`Failed to connect to daemon: ${err.message}`);
+  }
+}
+
+export async function commandSession(action = "reload", options = {}) {
+  const port = options.port || DEFAULT_PORT;
+  logger.banner();
+
+  const isNew = action === "new" || action === "new-chat" || action === "clean" || action === "reset";
+  const endpoint = isNew ? "/api/session/new" : "/api/session/reload";
+
+  logger.info(`Sending ${isNew ? 'New Chat' : 'Tab Reload'} instruction to Meta AI session...`);
+  try {
+    const res = await fetchApi(endpoint, { port, method: "POST" });
+    if (res.status === 200 && res.data?.ok) {
+      if (isNew) {
+        logger.success(`Started fresh Meta AI chat session on tab #${res.data.tabId || ''}!`);
+      } else {
+        logger.success(`Meta AI tab #${res.data.tabId || ''} reloaded successfully!`);
+      }
+    } else {
+      logger.error(`Session operation failed: ${res.data?.error || res.status}`);
+    }
   } catch (err) {
     logger.error(`Failed to connect to daemon: ${err.message}`);
   }

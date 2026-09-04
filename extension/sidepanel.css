@@ -540,10 +540,16 @@ body {
 
 /* Footer Buttons */
 .footer {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin-top: 4px;
+}
+
+.btn-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
 }
 
 .btn {
