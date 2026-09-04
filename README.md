@@ -12,6 +12,20 @@ It features real-time WebSocket communication, zero-dependency browser stream sn
 
 ---
 
+## Generated Examples & Showcase
+
+Here are real sample video animations generated end-to-end through the Ezy-Meta CLI:
+
+| Source Image | Motion Prompt | Generated Video (10s) |
+| :---: | :--- | :---: |
+| <img src="examples/panda.jpg" width="220" alt="Panda" /><br/>*Input (16:9)* | **Giant Panda Munching Bamboo**<br/>*"A cute giant panda happily chewing and munching on fresh green bamboo stalks, gently moving paws and blinking peacefully in the bamboo forest"* | [▶ **Watch panda.mp4**](examples/panda.mp4)<br/>`1216x672` @ `4,918 kbps` |
+| <img src="examples/dog_flying.jpg" width="220" alt="Flying Dog" /><br/>*Input (16:9)* | **Flying Angel Puppy**<br/>*"A joyful golden retriever puppy flapping its soft angel wings gently, flying forward through pastel clouds, happy smiling face with fluttering ears"* | [▶ **Watch dog_flying.mp4**](examples/dog_flying.mp4)<br/>`1216x672` @ `3,931 kbps` |
+| <img src="examples/calico_cat.jpg" width="220" alt="Calico Cat" /><br/>*Input (1:1)* | **Calico Cat Blinking**<br/>*"A cute calico cat blinking softly, looking around with curious eyes, twitching its ears naturally in cinematic motion"* | [▶ **Watch calico_cat.mp4**](examples/calico_cat.mp4)<br/>`960x960` @ `3,343 kbps` |
+
+> Additional assets and details are available in the [`examples/`](examples/) directory.
+
+---
+
 ## Architecture
 
 The following diagram adheres to the **[Diagram-Design](https://github.com/cathrynlavery/diagram-design)** editorial visual system (orthogonal routing, zero shadows, semantic tier boundaries, and focal node accentuation).
