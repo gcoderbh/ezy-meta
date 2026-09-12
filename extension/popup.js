@@ -91,7 +91,24 @@ function fetchState() {
       });
       return;
     }
-    render(state);
+
+    // Direct check with local daemon if connected to prevent stale queue cards
+    if (state.cliConnected) {
+      fetch("http://127.0.0.1:4242/api/queue")
+        .then(r => r.json())
+        .then(qRes => {
+          if (qRes) {
+            state.queue = qRes.queue || [];
+            state.activeTask = qRes.active || null;
+          }
+          render(state);
+        })
+        .catch(() => {
+          render(state);
+        });
+    } else {
+      render(state);
+    }
   });
 }
 

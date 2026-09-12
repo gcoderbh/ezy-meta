@@ -288,6 +288,7 @@ function handleServerMessage(msg) {
       state.history.unshift(histItem);
       chrome.storage.local.set({ stats: state.stats, history: state.history.slice(0, 50) });
       state.activeTask = null;
+      state.queue = (state.queue || []).filter(q => q.id !== taskId);
       capturedTaskUrls.delete(taskId);
       consecutiveGenerations++;
       state.session.consecutiveGenerations = consecutiveGenerations;
@@ -537,6 +538,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.type === "FORCE_RECONNECT") {
     connectWebSocket();
     checkMetaAiTab();
+    sendToServer("REQUEST_SNAPSHOT");
     sendResponse({ ok: true });
     return;
   }

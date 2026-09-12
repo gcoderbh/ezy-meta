@@ -7,6 +7,9 @@ yarn-error.log*
 # Generated Video Output and Local History
 output/*
 !output/.gitkeep
+outputs/*
+tmp/
+.tmp/
 
 # Sensitive HAR network captures, logs, and temp files
 *.har

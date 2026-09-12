@@ -113,17 +113,35 @@ async function runAnimateWorkflow(task) {
 
     // Step 1: Inject image attachment into Meta AI composer
     progress("Attaching image to Meta AI composer...");
-    const fileInput = document.querySelector('input[type="file"]');
+    let fileInput = document.querySelector('input[type="file"]');
+    if (!fileInput) {
+      const addAttachBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i]');
+      if (addAttachBtn) {
+        addAttachBtn.click();
+        await new Promise(r => setTimeout(r, 400));
+        fileInput = document.querySelector('input[type="file"]');
+      }
+    }
+
     if (fileInput) {
       const dt = new DataTransfer();
       dt.items.add(file);
       fileInput.files = dt.files;
-      fileInput.dispatchEvent(new Event("change", { bubbles: true }));
-      fileInput.dispatchEvent(new Event("input", { bubbles: true }));
+      fileInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+      fileInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
     }
 
-    // Wait for attachment preview chip to load
-    await new Promise(r => setTimeout(r, 1500));
+    // Wait and verify attachment preview chip appears
+    progress("Verifying image attachment in Meta AI composer...");
+    let attached = false;
+    for (let i = 0; i < 12; i++) {
+      await new Promise(r => setTimeout(r, 400));
+      const chip = document.querySelector('[data-testid*="attachment"], [aria-label*="Remove" i], [aria-label*="Delete" i], img[src*="blob:"], [class*="attachment"]');
+      if (chip) {
+        attached = true;
+        break;
+      }
+    }
 
     // Step 2: Format prompt and inject into textarea composer
     progress("Injecting prompt into composer...");
@@ -135,15 +153,29 @@ async function runAnimateWorkflow(task) {
     const textarea = document.querySelector('textarea[data-testid="composer-input"], [data-testid="composer-input"], textarea');
     if (textarea) {
       textarea.focus();
-      textarea.value = '';
+      try {
+        if (textarea._valueTracker) {
+          textarea._valueTracker.setValue("");
+        }
+      } catch (e) {}
+
+      // Method A: Native property descriptor setter
       const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
       if (setter) {
         setter.call(textarea, finalPrompt);
       } else {
         textarea.value = finalPrompt;
       }
-      textarea.dispatchEvent(new Event("input", { bubbles: true }));
-      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+      textarea.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+
+      // Method B: execCommand insertText fallback if value wasn't recognized
+      if (!textarea.value || textarea.value.length === 0) {
+        try {
+          document.execCommand("selectAll", false, null);
+          document.execCommand("insertText", false, finalPrompt);
+        } catch (e) {}
+      }
     }
 
     await new Promise(r => setTimeout(r, 1000));
@@ -151,14 +183,38 @@ async function runAnimateWorkflow(task) {
     // Step 3: Click Send button
     progress("Submitting message to Meta AI...");
     let sent = false;
-    for (let attempt = 0; attempt < 10; attempt++) {
+    for (let attempt = 0; attempt < 20; attempt++) {
       const sendBtn = document.querySelector('button[data-testid="composer-send-button"], button[aria-label*="Send" i], button[aria-label*="ส่ง" i]');
-      if (sendBtn && !sendBtn.disabled) {
+      const isDisabled = sendBtn ? (sendBtn.disabled || sendBtn.getAttribute("aria-disabled") === "true") : true;
+
+      if (sendBtn && !isDisabled) {
         sendBtn.click();
         sent = true;
+        // Clean composer textarea after submitting
+        setTimeout(() => {
+          if (textarea) {
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+            if (setter) setter.call(textarea, "");
+            else textarea.value = "";
+            textarea.dispatchEvent(new Event("input", { bubbles: true }));
+            textarea.dispatchEvent(new Event("change", { bubbles: true }));
+          }
+        }, 400);
         break;
       }
+
+      // If button is still disabled after 4 attempts, try Enter key on textarea
+      if (attempt >= 4 && textarea) {
+        textarea.focus();
+        textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+        textarea.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+      }
+
       await new Promise(r => setTimeout(r, 500));
+    }
+
+    if (!sent) {
+      throw new Error("Could not submit prompt to Meta AI (Send button remained disabled or unclickable). Please reload session.");
     }
 
     progress("Waiting for Meta AI response & animation trigger...");
@@ -183,6 +239,12 @@ async function runAnimateWorkflow(task) {
         return;
       }
 
+      // Auto-click "Scroll to bottom" button if present so animation is visible
+      const scrollBtn = document.querySelector('button[aria-label*="Scroll to bottom" i], button[aria-label*="เลื่อนลง" i]');
+      if (scrollBtn) {
+        try { scrollBtn.click(); } catch (e) {}
+      }
+
       // Check for Meta AI session errors or rate limits
       const errorEl = document.querySelector('[role="alert"], [data-testid*="error"]');
       if (errorEl && errorEl.innerText) {
@@ -190,6 +252,18 @@ async function runAnimateWorkflow(task) {
         if (errText.toLowerCase().includes("wrong") || errText.toLowerCase().includes("try again") || errText.toLowerCase().includes("limit")) {
           clearInterval(checkForVideoOrAnimate);
           fail(new Error(`Meta AI Session Error: ${errText}`));
+          return;
+        }
+      }
+
+      // Early detection: check if assistant replied that image was not received
+      const messages = Array.from(document.querySelectorAll('[data-testid*="message"], [role="presentation"]'));
+      if (messages.length > 0) {
+        const lastMsg = messages[messages.length - 1];
+        const lastText = (lastMsg.innerText || "").toLowerCase();
+        if (lastText.includes("didn't receive your") || (lastText.includes("upload") && lastText.includes("again") && lastText.includes("image"))) {
+          clearInterval(checkForVideoOrAnimate);
+          fail(new Error("Meta AI indicated the image attachment was not received. Please retry."));
           return;
         }
       }

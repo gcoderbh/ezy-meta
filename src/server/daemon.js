@@ -142,6 +142,10 @@ export class EzyMetaServer {
         const { taskId, error } = msg.payload || {};
         if (taskId) {
           this.queue.failTask(taskId, error || "Unknown extension execution error");
+          this.sendToExtension({
+            type: "SNAPSHOT_UPDATE",
+            payload: this.queue.getSnapshot()
+          });
           // Proceed to next pending task
           setTimeout(() => this.dispatchNextTask(), 1000);
         }
@@ -414,11 +418,21 @@ export class EzyMetaServer {
           score: bestScore
         }
       });
+
+      // Always broadcast updated queue snapshot so Side Panel UI is 100% in sync
+      this.sendToExtension({
+        type: "SNAPSHOT_UPDATE",
+        payload: this.queue.getSnapshot()
+      });
     } catch (err) {
       console.error(`[Download / Evaluator Error] Task ${taskId}:`, err.message);
       this.queue.completeTask(taskId, {
         videoUrl: candidateItems[0]?.url,
         localVideoPath: null
+      });
+      this.sendToExtension({
+        type: "SNAPSHOT_UPDATE",
+        payload: this.queue.getSnapshot()
       });
     }
 
@@ -467,6 +481,18 @@ export class EzyMetaServer {
         active: this.queue.activeTask,
         queue: this.queue.queue
       });
+    }
+
+    if (url.pathname === "/api/queue/clear" && req.method === "POST") {
+      if (this.queue.activeTask) {
+        this.queue.failTask(this.queue.activeTask.id, "Manually cancelled");
+      }
+      this.queue.queue = [];
+      this.sendToExtension({
+        type: "SNAPSHOT_UPDATE",
+        payload: this.queue.getSnapshot()
+      });
+      return json({ ok: true, message: "Queue cleared" });
     }
 
     if (url.pathname === "/api/history" && req.method === "GET") {
