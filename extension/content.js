@@ -47,22 +47,25 @@ if (document.body) {
   });
 }
 
-// Listen for commands from background script
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  if (request.type === "PING") {
-    sendResponse({
-      ready: isMetaAiReady(),
-      user: getLoggedInUser()
-    });
-    return true;
-  }
+// Listen for commands from background script (guarded to avoid duplicate executions)
+if (!window.__EZY_META_LISTENER_REGISTERED__) {
+  window.__EZY_META_LISTENER_REGISTERED__ = true;
+  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+    if (request.type === "PING") {
+      sendResponse({
+        ready: isMetaAiReady(),
+        user: getLoggedInUser()
+      });
+      return true;
+    }
 
-  if (request.type === "RUN_ANIMATE_TASK") {
-    runAnimateWorkflow(request.payload);
-    sendResponse({ started: true });
-    return true;
-  }
-});
+    if (request.type === "RUN_ANIMATE_TASK") {
+      runAnimateWorkflow(request.payload);
+      sendResponse({ started: true });
+      return true;
+    }
+  });
+}
 
 async function runAnimateWorkflow(task) {
   const { taskId, imageBase64, mimeType = "image/jpeg", prompt = "Turn this photo into a video" } = task;

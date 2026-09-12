@@ -43,6 +43,26 @@ async function reloadMetaAiTab({ newChat = false } = {}) {
   state.session.lastRefresh = new Date().toISOString();
   broadcastState();
 
+  // 1. Before navigating, dismiss any discard modal or draft warning in page
+  try {
+    await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => {
+        const btns = Array.from(document.querySelectorAll('button, [role="button"], a'));
+        for (const b of btns) {
+          const t = (b.innerText || b.getAttribute("aria-label") || "").toLowerCase();
+          if (t.includes("discard") || t.includes("leave") || t.includes("ทิ้ง") || t === "yes" || t === "ok") {
+            b.click();
+            break;
+          }
+        }
+        // Also click native New Chat if available in sidebar
+        const newChatBtn = document.querySelector('a[href="/"], [aria-label*="New chat" i], [data-testid*="new-chat"]');
+        if (newChatBtn) newChatBtn.click();
+      }
+    });
+  } catch (e) {}
+
   return new Promise((resolve) => {
     let resolved = false;
 
@@ -51,10 +71,31 @@ async function reloadMetaAiTab({ newChat = false } = {}) {
       resolved = true;
       consecutiveGenerations = 0;
       state.session.consecutiveGenerations = 0;
+
+      // 2. Post-navigation: check again for any modal/prompt and clean textarea
       setTimeout(async () => {
+        try {
+          await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+              const btns = Array.from(document.querySelectorAll('button, [role="button"]'));
+              for (const b of btns) {
+                const t = (b.innerText || b.getAttribute("aria-label") || "").toLowerCase();
+                if (t.includes("discard") || t.includes("leave") || t.includes("confirm") || t.includes("ทิ้ง")) {
+                  b.click();
+                }
+              }
+              const textarea = document.querySelector('textarea');
+              if (textarea && textarea.value) {
+                textarea.value = '';
+              }
+            }
+          });
+        } catch (e) {}
+
         await checkMetaAiTab();
         resolve({ ok: true, tabId, newChat });
-      }, 1200);
+      }, 1500);
     };
 
     const onUpdatedListener = (updatedTabId, changeInfo) => {
