@@ -43,11 +43,26 @@ async function reloadMetaAiTab({ newChat = false } = {}) {
   state.session.lastRefresh = new Date().toISOString();
   broadcastState();
 
-  // 1. Before navigating, dismiss any discard modal or draft warning in page
+  // 1. Before navigating, neutralize beforeunload and clear textarea so Chrome NEVER triggers "Leave site?"
   try {
     await chrome.scripting.executeScript({
       target: { tabId },
       func: () => {
+        // Neutralize beforeunload
+        window.onbeforeunload = null;
+        try {
+          Object.defineProperty(window, "onbeforeunload", { get: () => null, set: () => {} });
+        } catch (e) {}
+
+        // Clear textarea draft completely so page has zero unsaved changes
+        const textarea = document.querySelector('textarea');
+        if (textarea) {
+          textarea.value = '';
+          textarea.dispatchEvent(new Event('input', { bubbles: true }));
+          textarea.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+
+        // Dismiss any existing discard or leave modal
         const btns = Array.from(document.querySelectorAll('button, [role="button"], a'));
         for (const b of btns) {
           const t = (b.innerText || b.getAttribute("aria-label") || "").toLowerCase();

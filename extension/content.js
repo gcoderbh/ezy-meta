@@ -1,6 +1,39 @@
 // Ezy-Meta Content Script (runs on https://www.meta.ai/*)
 console.log("[EzyMeta] Content script loaded on Meta AI");
 
+// 1. Prevent Meta AI from showing native browser "Leave site? Changes you made may not be saved." dialog
+window.addEventListener("beforeunload", (e) => {
+  e.stopImmediatePropagation();
+  delete e.returnValue;
+}, true);
+try {
+  window.onbeforeunload = null;
+  Object.defineProperty(window, "onbeforeunload", {
+    get: () => null,
+    set: () => {}
+  });
+} catch (e) {}
+
+// 2. Auto-dismiss in-page "Discard prompt?" or "Leave" modals automatically
+const autoDiscardObserver = new MutationObserver(() => {
+  const modalBtns = Array.from(document.querySelectorAll('[role="dialog"] button, [role="alertdialog"] button, [data-testid*="modal"] button'));
+  for (const b of modalBtns) {
+    const text = (b.innerText || b.getAttribute("aria-label") || "").trim().toLowerCase();
+    if (text === "discard" || text.includes("discard") || text.includes("ทิ้ง") || text === "leave") {
+      console.log("[EzyMeta] Auto-dismissing in-page discard modal by clicking:", text);
+      b.click();
+      break;
+    }
+  }
+});
+if (document.body) {
+  autoDiscardObserver.observe(document.body, { childList: true, subtree: true });
+} else {
+  document.addEventListener("DOMContentLoaded", () => {
+    if (document.body) autoDiscardObserver.observe(document.body, { childList: true, subtree: true });
+  });
+}
+
 function getLoggedInUser() {
   const userBtn = document.querySelector('[testid="user-menu-button"], [id*="user-menu"]');
   if (userBtn) return userBtn.innerText.trim();
@@ -116,33 +149,43 @@ async function runAnimateWorkflow(task) {
 
     // Step 1: Inject image attachment into Meta AI composer
     progress("Attaching image to Meta AI composer...");
-    let fileInput = document.querySelector('input[type="file"]');
-    if (!fileInput) {
-      const addAttachBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i]');
-      if (addAttachBtn) {
-        addAttachBtn.click();
-        await new Promise(r => setTimeout(r, 400));
-        fileInput = document.querySelector('input[type="file"]');
+    const attachImage = async () => {
+      let fileInput = document.querySelector('input[type="file"]');
+      if (!fileInput) {
+        const addAttachBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i]');
+        if (addAttachBtn) {
+          addAttachBtn.click();
+          await new Promise(r => setTimeout(r, 400));
+          fileInput = document.querySelector('input[type="file"]');
+        }
       }
-    }
 
-    if (fileInput) {
-      const dt = new DataTransfer();
-      dt.items.add(file);
-      fileInput.files = dt.files;
-      fileInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-      fileInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
-    }
+      if (fileInput) {
+        const dt = new DataTransfer();
+        dt.items.add(file);
+        fileInput.files = dt.files;
+        fileInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+        fileInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      }
+    };
+
+    await attachImage();
 
     // Wait and verify attachment preview chip appears
     progress("Verifying image attachment in Meta AI composer...");
     let attached = false;
-    for (let i = 0; i < 12; i++) {
+    for (let i = 0; i < 20; i++) {
       await new Promise(r => setTimeout(r, 400));
       const chip = document.querySelector('[data-testid*="attachment"], [aria-label*="Remove" i], [aria-label*="Delete" i], img[src*="blob:"], [class*="attachment"]');
       if (chip) {
         attached = true;
+        // Wait extra 600ms for upload processing
+        await new Promise(r => setTimeout(r, 600));
         break;
+      }
+      if (i === 6) {
+        // Retry attaching if not captured on first attempt
+        await attachImage();
       }
     }
 
@@ -156,42 +199,51 @@ async function runAnimateWorkflow(task) {
     const textarea = document.querySelector('textarea[data-testid="composer-input"], [data-testid="composer-input"], textarea');
     if (textarea) {
       textarea.focus();
+      textarea.select();
+
+      // 1. Clear any prior content
       try {
         if (textarea._valueTracker) {
           textarea._valueTracker.setValue("");
         }
       } catch (e) {}
+      textarea.value = "";
 
-      // Method A: Native property descriptor setter
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-      if (setter) {
-        setter.call(textarea, finalPrompt);
-      } else {
-        textarea.value = finalPrompt;
-      }
-      textarea.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
-      textarea.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+      // 2. Primary: Use execCommand insertText (simulates real keyboard input for React / Lexical)
+      try {
+        document.execCommand("selectAll", false, null);
+        document.execCommand("delete", false, null);
+        document.execCommand("insertText", false, finalPrompt);
+      } catch (e) {}
 
-      // Method B: execCommand insertText fallback if value wasn't recognized
-      if (!textarea.value || textarea.value.length === 0) {
-        try {
-          document.execCommand("selectAll", false, null);
-          document.execCommand("insertText", false, finalPrompt);
-        } catch (e) {}
+      // 3. Guarantee setter was applied if execCommand didn't fill it
+      if (!textarea.value || textarea.value !== finalPrompt) {
+        const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+        if (setter) {
+          setter.call(textarea, finalPrompt);
+        } else {
+          textarea.value = finalPrompt;
+        }
       }
+
+      // 4. Dispatch full spectrum of input and change events for React synthetic event dispatcher
+      textarea.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, composed: true, inputType: "insertText", data: finalPrompt }));
+      textarea.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: finalPrompt }));
+      textarea.dispatchEvent(new Event("change", { bubbles: true }));
     }
 
-    await new Promise(r => setTimeout(r, 1000));
+    await new Promise(r => setTimeout(r, 800));
 
     // Step 3: Click Send button
     progress("Submitting message to Meta AI...");
     let sent = false;
-    for (let attempt = 0; attempt < 20; attempt++) {
+    for (let attempt = 0; attempt < 30; attempt++) {
       const sendBtn = document.querySelector('button[data-testid="composer-send-button"], button[aria-label*="Send" i], button[aria-label*="ส่ง" i]');
       const isDisabled = sendBtn ? (sendBtn.disabled || sendBtn.getAttribute("aria-disabled") === "true") : true;
 
       if (sendBtn && !isDisabled) {
         sendBtn.click();
+        sendBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
         sent = true;
         // Clean composer textarea after submitting
         setTimeout(() => {
@@ -206,14 +258,14 @@ async function runAnimateWorkflow(task) {
         break;
       }
 
-      // If button is still disabled after 4 attempts, try Enter key on textarea
-      if (attempt >= 4 && textarea) {
+      // If button is still disabled after several attempts, re-nudge textarea to trigger React re-render
+      if (attempt % 3 === 2 && textarea) {
         textarea.focus();
-        textarea.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
-        textarea.dispatchEvent(new KeyboardEvent("keyup", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
+        textarea.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: "" }));
+        textarea.dispatchEvent(new Event("change", { bubbles: true }));
       }
 
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 400));
     }
 
     if (!sent) {
