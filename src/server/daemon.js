@@ -222,16 +222,23 @@ export class EzyMetaServer {
     });
   }
 
-  testInjection() {
+  testInjection(imagePath = "work/thief_16x9.jpg") {
     return new Promise((resolve, reject) => {
       if (!this.extensionSocket || this.extensionSocket.readyState !== 1) {
         return reject(new Error("Extension not connected via WebSocket"));
       }
+      let imageBase64 = null;
+      let mimeType = "image/jpeg";
+      if (imagePath && fs.existsSync(path.resolve(imagePath))) {
+        imageBase64 = fs.readFileSync(path.resolve(imagePath)).toString("base64");
+        mimeType = imagePath.endsWith(".png") ? "image/png" : "image/jpeg";
+      }
+
       const reqId = "test_" + Date.now();
       const timer = setTimeout(() => {
         delete this.pendingInspects[reqId];
         reject(new Error("Timeout testing injection"));
-      }, 5000);
+      }, 8000);
 
       this.pendingInspects[reqId] = (data) => {
         clearTimeout(timer);
@@ -240,7 +247,7 @@ export class EzyMetaServer {
 
       this.sendToExtension({
         type: "TEST_INJECTION",
-        payload: { reqId }
+        payload: { reqId, imageBase64, mimeType }
       });
     });
   }
@@ -529,6 +536,21 @@ export class EzyMetaServer {
     if (url.pathname === "/api/reload" && req.method === "POST") {
       this.sendToExtension({ type: "RELOAD_EXTENSION" });
       return json({ ok: true, message: "Reload signal sent to extension" });
+    }
+
+    if (url.pathname === "/api/send-message" && req.method === "POST") {
+      let bodyStr = "";
+      req.on("data", chunk => { bodyStr += chunk; });
+      req.on("end", async () => {
+        try {
+          const body = JSON.parse(bodyStr || "{}");
+          this.sendToExtension({ type: "SEND_RAW_MESSAGE", payload: body });
+          return json({ ok: true, message: "Raw message dispatched to tab" });
+        } catch (err) {
+          return json({ ok: false, error: err.message }, 400);
+        }
+      });
+      return;
     }
 
     if (url.pathname === "/api/test-injection" && req.method === "GET") {

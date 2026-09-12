@@ -426,34 +426,109 @@ function handleServerMessage(msg) {
     }
 
     case "TEST_INJECTION": {
-      const reqId = msg.payload?.reqId;
+      const { reqId, imageBase64, mimeType } = msg.payload || {};
+      if (!metaAiTabId) {
+        sendToServer("INSPECT_RESULT", { reqId, error: "No Meta AI tab ID found" });
+        break;
+      }
       chrome.scripting.executeScript({
         target: { tabId: metaAiTabId },
-        func: () => {
-          const diag = {};
+        args: [imageBase64, mimeType],
+        func: async (inBase64, inMime) => {
+          const diag = { steps: [] };
           try {
-            const textarea = document.querySelector('textarea[data-testid="composer-input"], [data-testid="composer-input"], textarea');
+            let file;
+            if (inBase64) {
+              const byteCharacters = atob(inBase64);
+              const byteArrays = [];
+              for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+                const slice = byteCharacters.slice(offset, offset + 512);
+                const byteNumbers = new Array(slice.length);
+                for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
+                byteArrays.push(new Uint8Array(byteNumbers));
+              }
+              const blob = new Blob(byteArrays, { type: inMime || "image/jpeg" });
+              file = new File([blob], "input." + (inMime?.includes("png") ? "png" : "jpg"), { type: inMime || "image/jpeg" });
+            } else {
+              const byteCharacters = atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==");
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+              const blob = new Blob([new Uint8Array(byteNumbers)], { type: "image/png" });
+              file = new File([blob], "test.png", { type: "image/png" });
+            }
+            diag.fileSize = file.size;
+            diag.fileType = file.type;
+
+            // Method 1: Check existing file inputs
+            const inputs = Array.from(document.querySelectorAll('input[type="file"]'));
+            diag.foundInputs = inputs.length;
+
+            // Check if there is an Add Attachment button
+            const addBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i]');
+            diag.hasAddBtn = !!addBtn;
+
+            // Test Method 1A: direct assign to input
+            if (inputs.length > 0) {
+              const inp = inputs[0];
+              const dt = new DataTransfer();
+              dt.items.add(file);
+              inp.files = dt.files;
+              inp.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+              inp.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+              diag.steps.push("assigned files to input[0]");
+            }
+
+            // Test Method 2: Paste event on textarea
+            const textarea = document.querySelector('textarea');
             if (textarea) {
-              textarea.focus();
-              textarea.value = '';
-              const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-              if (setter) {
-                setter.call(textarea, "Animate this cat into a video");
-              }
-              textarea.dispatchEvent(new Event("input", { bubbles: true }));
-              textarea.dispatchEvent(new Event("change", { bubbles: true }));
-              diag.afterInputVal = textarea.value;
+              const dtPaste = new DataTransfer();
+              dtPaste.items.add(file);
+              const pasteEvt = new ClipboardEvent("paste", {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: dtPaste
+              });
+              textarea.dispatchEvent(pasteEvt);
+              diag.steps.push("dispatched paste event on textarea");
             }
 
-            const sendBtn = document.querySelector('button[data-testid="composer-send-button"], button[aria-label*="Send" i]');
-            if (sendBtn) {
-              diag.sendBtnDisabled = sendBtn.disabled;
-              if (!sendBtn.disabled) {
-                sendBtn.click();
-                diag.submitted = true;
-              }
+            // Test Method 3: Drop event on composer
+            const composer = document.querySelector('[data-testid="composer-input"]') || textarea;
+            if (composer) {
+              const dtDrop = new DataTransfer();
+              dtDrop.items.add(file);
+              const dropEvt = new DragEvent("drop", {
+                bubbles: true,
+                cancelable: true,
+                dataTransfer: dtDrop
+              });
+              composer.dispatchEvent(dropEvt);
+              diag.steps.push("dispatched drop event on composer");
             }
 
+            // Wait 1s and check if any attachment chip / image preview appeared
+            await new Promise(r => setTimeout(r, 1200));
+            const chips = Array.from(document.querySelectorAll('[data-testid*="attachment"], [aria-label*="Remove" i], [aria-label*="Delete" i], img[src*="blob:"], [class*="attachment"]'));
+            diag.chipCountAfter = chips.length;
+            diag.chipSelectors = chips.map(c => c.tagName + " " + (c.className || "") + " " + (c.getAttribute("data-testid") || c.getAttribute("aria-label") || ""));
+
+            const sendBtn = document.querySelector('button[aria-label="Send"], button[data-testid="composer-send-button"], button[aria-label*="Send" i]');
+            diag.sendBtnFound = !!sendBtn;
+            diag.sendBtnDisabled = sendBtn ? sendBtn.disabled : null;
+
+            if (sendBtn && !sendBtn.disabled) {
+              sendBtn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.click();
+              diag.clickedSend = true;
+            }
+
+            if (textarea) {
+              textarea.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13, view: window }));
+              diag.dispatchedEnter = true;
+            }
           } catch (outerErr) {
             diag.outerError = outerErr.message;
           }
@@ -466,6 +541,37 @@ function handleServerMessage(msg) {
           data: results && results[0] ? results[0].result : null,
           error: err
         });
+      });
+      break;
+    }
+
+    case "SEND_RAW_MESSAGE": {
+      const text = msg.payload?.text || "";
+      if (!metaAiTabId) break;
+      chrome.scripting.executeScript({
+        target: { tabId: metaAiTabId },
+        args: [text],
+        func: (inText) => {
+          const textarea = document.querySelector('textarea[data-testid="composer-input"], textarea');
+          if (!textarea) return;
+          textarea.focus();
+          const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+          if (setter) setter.call(textarea, inText);
+          else textarea.value = inText;
+          textarea.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+          textarea.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+          setTimeout(() => {
+            const sendBtn = document.querySelector('button[aria-label="Send"], button[data-testid="composer-send-button"]');
+            if (sendBtn && !sendBtn.disabled) {
+              sendBtn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
+              sendBtn.click();
+            }
+            textarea.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13, view: window }));
+          }, 300);
+        }
       });
       break;
     }

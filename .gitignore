@@ -8,8 +8,15 @@ yarn-error.log*
 output/*
 !output/.gitkeep
 outputs/*
+work/
+scratch/
 tmp/
 .tmp/
+
+# Environment and sensitive files
+.env
+.env.local
+*.env
 
 # Sensitive HAR network captures, logs, and temp files
 *.har

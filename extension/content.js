@@ -147,15 +147,28 @@ async function runAnimateWorkflow(task) {
     const filename = `input_${Date.now()}.${mimeType.includes("png") ? "png" : "jpg"}`;
     const file = new File([blob], filename, { type: mimeType });
 
+    // Step 0: Ensure Meta AI composer is hydrated and ready
+    progress("Waiting for Meta AI composer to hydrate...");
+    for (let i = 0; i < 30; i++) {
+      const fileInp = document.querySelector('input[type="file"]');
+      const addBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i]');
+      const skeleton = document.querySelector('.composer-add-attachment-button-skeleton');
+      if ((fileInp || addBtn) && !skeleton) {
+        break;
+      }
+      await new Promise(r => setTimeout(r, 300));
+    }
+
     // Step 1: Inject image attachment into Meta AI composer
     progress("Attaching image to Meta AI composer...");
     const attachImage = async () => {
+      // 1. Direct file input
       let fileInput = document.querySelector('input[type="file"]');
       if (!fileInput) {
-        const addAttachBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i]');
+        const addAttachBtn = document.querySelector('button[aria-label*="attachment" i], button[aria-label*="แนบ" i], [class*="add-attachment"]');
         if (addAttachBtn) {
           addAttachBtn.click();
-          await new Promise(r => setTimeout(r, 400));
+          await new Promise(r => setTimeout(r, 300));
           fileInput = document.querySelector('input[type="file"]');
         }
       }
@@ -167,6 +180,33 @@ async function runAnimateWorkflow(task) {
         fileInput.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
         fileInput.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
       }
+
+      // 2. ClipboardEvent paste on textarea
+      const textarea = document.querySelector('textarea[data-testid="composer-input"], textarea');
+      if (textarea) {
+        textarea.focus();
+        const dtPaste = new DataTransfer();
+        dtPaste.items.add(file);
+        const pasteEvt = new ClipboardEvent("paste", {
+          bubbles: true,
+          cancelable: true,
+          clipboardData: dtPaste
+        });
+        textarea.dispatchEvent(pasteEvt);
+      }
+
+      // 3. DragEvent drop on composer
+      const composer = document.querySelector('[data-testid="composer-input"]') || textarea;
+      if (composer) {
+        const dtDrop = new DataTransfer();
+        dtDrop.items.add(file);
+        const dropEvt = new DragEvent("drop", {
+          bubbles: true,
+          cancelable: true,
+          dataTransfer: dtDrop
+        });
+        composer.dispatchEvent(dropEvt);
+      }
     };
 
     await attachImage();
@@ -174,95 +214,89 @@ async function runAnimateWorkflow(task) {
     // Wait and verify attachment preview chip appears
     progress("Verifying image attachment in Meta AI composer...");
     let attached = false;
-    for (let i = 0; i < 20; i++) {
+    for (let i = 0; i < 25; i++) {
       await new Promise(r => setTimeout(r, 400));
-      const chip = document.querySelector('[data-testid*="attachment"], [aria-label*="Remove" i], [aria-label*="Delete" i], img[src*="blob:"], [class*="attachment"]');
+      const chip = document.querySelector('button[aria-label*="Remove image" i], [data-testid*="attachment"], [aria-label*="Remove" i], [aria-label*="Delete" i], img[src*="blob:"], [class*="attachment"]');
       if (chip) {
         attached = true;
-        // Wait extra 600ms for upload processing
-        await new Promise(r => setTimeout(r, 600));
+        // Wait extra 1200ms for image upload to complete on Meta CDN
+        await new Promise(r => setTimeout(r, 1200));
         break;
       }
-      if (i === 6) {
-        // Retry attaching if not captured on first attempt
+      if (i % 6 === 5) {
+        // Retry attach if not seen yet
         await attachImage();
       }
+    }
+
+    if (!attached) {
+      throw new Error("Could not attach image to Meta AI composer within timeout.");
     }
 
     // Step 2: Format prompt and inject into textarea composer
     progress("Injecting prompt into composer...");
     const promptLower = prompt.toLowerCase();
-    const finalPrompt = promptLower.includes("animate") || promptLower.includes("turn this photo") || promptLower.includes("video")
-      ? prompt
-      : `Turn this photo into a video: ${prompt}`;
-
-    const textarea = document.querySelector('textarea[data-testid="composer-input"], [data-testid="composer-input"], textarea');
-    if (textarea) {
-      textarea.focus();
-      textarea.select();
-
-      // 1. Clear any prior content
-      try {
-        if (textarea._valueTracker) {
-          textarea._valueTracker.setValue("");
-        }
-      } catch (e) {}
-      textarea.value = "";
-
-      // 2. Primary: Use execCommand insertText (simulates real keyboard input for React / Lexical)
-      try {
-        document.execCommand("selectAll", false, null);
-        document.execCommand("delete", false, null);
-        document.execCommand("insertText", false, finalPrompt);
-      } catch (e) {}
-
-      // 3. Guarantee setter was applied if execCommand didn't fill it
-      if (!textarea.value || textarea.value !== finalPrompt) {
-        const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-        if (setter) {
-          setter.call(textarea, finalPrompt);
-        } else {
-          textarea.value = finalPrompt;
-        }
-      }
-
-      // 4. Dispatch full spectrum of input and change events for React synthetic event dispatcher
-      textarea.dispatchEvent(new InputEvent("beforeinput", { bubbles: true, composed: true, inputType: "insertText", data: finalPrompt }));
-      textarea.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: finalPrompt }));
-      textarea.dispatchEvent(new Event("change", { bubbles: true }));
+    let finalPrompt = prompt;
+    if (!promptLower.startsWith("turn this photo into a video") && !promptLower.startsWith("animate this")) {
+      finalPrompt = `Turn this photo into a video: ${prompt.replace(/^turn this photo into a 2D game sprite animation:\s*/i, "")}`;
     }
 
-    await new Promise(r => setTimeout(r, 800));
+    const textarea = document.querySelector('textarea[data-testid="composer-input"], [data-testid="composer-input"], textarea');
+    const setComposerText = (targetText) => {
+      const el = document.querySelector('textarea[data-testid="composer-input"], [data-testid="composer-input"], textarea');
+      if (!el) return;
+      el.focus();
+      const currentVal = el.value || "";
+      // Preserve any [image:UUID] tokens from composer
+      const tokens = currentVal.match(/\[image:[^\]]+\]/g) || [];
+      const cleanPrompt = targetText.replace(/Tell me about this image\.?/gi, "").trim();
+      const combined = tokens.length > 0 ? `${tokens.join(" ")} ${cleanPrompt}` : cleanPrompt;
+
+      const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
+      if (setter) {
+        setter.call(el, combined);
+      } else {
+        el.value = combined;
+      }
+      el.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
+      el.dispatchEvent(new Event("change", { bubbles: true, composed: true }));
+    };
+
+    setComposerText(finalPrompt);
+    await new Promise(r => setTimeout(r, 600));
+    // Re-apply in case Meta AI finished upload and inserted default text
+    setComposerText(finalPrompt);
+    await new Promise(r => setTimeout(r, 600));
 
     // Step 3: Click Send button
     progress("Submitting message to Meta AI...");
     let sent = false;
     for (let attempt = 0; attempt < 30; attempt++) {
+      // Guarantee prompt is still in textarea and not replaced by default text
+      const currentArea = document.querySelector('textarea[data-testid="composer-input"], textarea');
+      if (currentArea && (!currentArea.value || currentArea.value.includes("Tell me about this image"))) {
+        setComposerText(finalPrompt);
+      }
+
       const sendBtn = document.querySelector('button[data-testid="composer-send-button"], button[aria-label*="Send" i], button[aria-label*="ส่ง" i]');
       const isDisabled = sendBtn ? (sendBtn.disabled || sendBtn.getAttribute("aria-disabled") === "true") : true;
 
       if (sendBtn && !isDisabled) {
+        sendBtn.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, cancelable: true, view: window }));
+        sendBtn.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, cancelable: true, view: window }));
+        sendBtn.dispatchEvent(new PointerEvent("pointerup", { bubbles: true, cancelable: true, view: window }));
+        sendBtn.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, view: window }));
         sendBtn.click();
-        sendBtn.dispatchEvent(new MouseEvent("click", { bubbles: true, cancelable: true }));
+        if (currentArea) {
+          currentArea.dispatchEvent(new KeyboardEvent("keydown", { bubbles: true, cancelable: true, key: "Enter", code: "Enter", keyCode: 13, which: 13, view: window }));
+        }
         sent = true;
-        // Clean composer textarea after submitting
-        setTimeout(() => {
-          if (textarea) {
-            const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, "value")?.set;
-            if (setter) setter.call(textarea, "");
-            else textarea.value = "";
-            textarea.dispatchEvent(new Event("input", { bubbles: true }));
-            textarea.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-        }, 400);
         break;
       }
 
-      // If button is still disabled after several attempts, re-nudge textarea to trigger React re-render
-      if (attempt % 3 === 2 && textarea) {
-        textarea.focus();
-        textarea.dispatchEvent(new InputEvent("input", { bubbles: true, composed: true, inputType: "insertText", data: "" }));
-        textarea.dispatchEvent(new Event("change", { bubbles: true }));
+      if (attempt % 3 === 2 && currentArea) {
+        currentArea.focus();
+        currentArea.dispatchEvent(new Event("input", { bubbles: true, composed: true }));
       }
 
       await new Promise(r => setTimeout(r, 400));
@@ -321,6 +355,16 @@ async function runAnimateWorkflow(task) {
           fail(new Error("Meta AI indicated the image attachment was not received. Please retry."));
           return;
         }
+        if (lastText.includes("reached your limit") || lastText.includes("meta one core") || lastText.includes("wait until tomorrow")) {
+          clearInterval(checkForVideoOrAnimate);
+          fail(new Error("Meta AI Rate Limit: You reached your daily media limit. Get Meta One Core or wait until reset."));
+          return;
+        }
+        if (lastText.includes("server error") || lastText.includes("couldn't be generated") || lastText.includes("could not be generated")) {
+          clearInterval(checkForVideoOrAnimate);
+          fail(new Error("Meta AI video server error: generation failed on backend."));
+          return;
+        }
       }
 
       // 1. Check if "Animate" button appears (on hover or in media action rail)
@@ -344,11 +388,15 @@ async function runAnimateWorkflow(task) {
           return (
             aria === "animate" ||
             aria.includes("animate") ||
+            aria.includes("animation") ||
             title === "animate" ||
             title.includes("animate") ||
+            title.includes("animation") ||
             text === "animate" ||
             text.includes("animate") ||
-            testid.includes("animate")
+            text.includes("animation") ||
+            testid.includes("animate") ||
+            testid.includes("animation")
           );
         });
 
